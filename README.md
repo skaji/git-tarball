@@ -41,7 +41,7 @@ $ git tarball --help
 
 ## License
 
-MIT
+This software is licensed under the same terms as Perl.
 
 ## Author
 
