@@ -1,0 +1,102 @@
+#!/usr/bin/env perl
+#
+# Usage: git tarball [options] [commitish]
+#  -g, --gzip    create tar.gz (default)
+#  -b, --bzip2   create tar.bz2
+#  -p, --prefix  create tarball with the prefix, default: top directory name
+#  -h, --help    show this help
+#
+# Examples:
+#  git tarball                # create tarball with HEAD
+#  git tarball 0f7fea7        # create tarball with 0f7fea7
+#  git tarball --bzip         # create tar.bz2
+#  git tarball --prefix=hello # create hello.tar.gz
+#
+use strict;
+use warnings;
+
+package App;
+use Getopt::Long qw/:config no_auto_abbrev no_ignore_case bundling/;
+use File::Basename ();
+use Fcntl ();
+
+sub new { bless { compress => "gzip" }, shift }
+
+sub parse_options {
+    my $self = shift;
+    local @ARGV = @_;
+    GetOptions
+        "b|bzip2" => sub { $self->{compress} = "bzip2" },
+        "g|gzip"  => sub { $self->{compress} = "gzip" },
+        "h|help"  => sub { $self->help; exit },
+    or exit 1;
+    $self->{commit} = shift @ARGV || "HEAD";
+    $self;
+}
+
+sub _capture {
+    my @cmd = @_;
+    open my $fh, "-|", @cmd or die "@cmd: $!\n";
+    my @line = <$fh>;
+    close $fh;
+    return if $? != 0;
+    my $out = join "", @line;
+    chomp $out;
+    $out;
+}
+
+sub _turn_off_close_on_exec {
+    my $fh = shift;
+    fcntl $fh, Fcntl::F_SETFD, my $flag = '';
+}
+
+sub run {
+    my $class = shift;
+    my $self = $class->new;
+    $self->parse_options(@_);
+    my $top_abs = _capture "git", "rev-parse", "--show-toplevel" or exit 1;
+    my $top = File::Basename::basename($top_abs);
+    my $out_file = $self->{compress} eq "gzip" ? "$top.tar.gz" : "$top.tar.bz2";
+    pipe my $read, my $write;
+    _turn_off_close_on_exec $_ for $read, $write;
+    my $pid_git = fork;
+    die "fork: $!" unless defined $pid_git;
+    if ($pid_git == 0) {
+        close $read;
+        open STDOUT, ">&", $write;
+        exec "git", "archive", "--format", "tar", "--prefix", "$top/", $self->{commit};
+        exit 255;
+    }
+    my $pid_compress = fork;
+    die "fork: $!" unless defined $pid_compress;
+    if ($pid_compress == 0) {
+        close $write;
+        open STDIN, "<&", $read;
+        open STDOUT, ">", $out_file or exit 255;
+        exec {$self->{compress}} $self->{compress};
+        exit 255;
+    }
+    close $_ for $read, $write;
+
+    waitpid $pid_git, 0;
+    my $exit_git = $?;
+    waitpid $pid_compress, 0;
+    my $exit_compress = $?;
+    if ($exit_git == 0 and $exit_compress == 0) {
+        # OK
+    } else {
+        exit 1;
+    }
+}
+
+sub help {
+    open my $fh, "<", $0 or return;
+    (undef, my @line) = <$fh>;
+    for (@line) {
+        s/^#// and print and next;
+        return;
+    }
+}
+
+package main;
+App->run(@ARGV);
