@@ -65,7 +65,7 @@ sub run {
     if ($pid_compress == 0) {
         close $write;
         open STDIN, "<&", $read;
-        open STDOUT, ">", $out_file or exit 255;
+        open STDOUT, ">", "$out_file.tmp" or exit 255;
         exec {$self->{compress}} $self->{compress};
         exit 255;
     }
@@ -76,8 +76,10 @@ sub run {
     waitpid $pid_compress, 0;
     my $exit_compress = $?;
     if ($exit_git == 0 and $exit_compress == 0) {
+        rename "$out_file.tmp", $out_file or die $!;
         # OK
     } else {
+        unlink "$out_file.tmp";
         exit 1;
     }
 }
