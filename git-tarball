@@ -45,11 +45,6 @@ sub _capture {
     $out;
 }
 
-sub _turn_off_close_on_exec {
-    my $fh = shift;
-    fcntl $fh, Fcntl::F_SETFD, my $flag = '';
-}
-
 sub run {
     my $class = shift;
     my $self = $class->new;
@@ -58,7 +53,6 @@ sub run {
     my $top = File::Basename::basename($top_abs);
     my $out_file = $self->{compress} eq "gzip" ? "$top.tar.gz" : "$top.tar.bz2";
     pipe my $read, my $write;
-    _turn_off_close_on_exec $_ for $read, $write;
     my $pid_git = fork;
     die "fork: $!" unless defined $pid_git;
     if ($pid_git == 0) {
