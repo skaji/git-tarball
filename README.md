@@ -3,7 +3,7 @@
 Create a tarball of the git repository. Yes, this is a shortcut for
 
 ```
-$ git archive --format tar --prefix repo HEAD | gzip > repo.tar.gz
+$ git archive --format tar --prefix repo/ HEAD | gzip > repo.tar.gz
 ```
 with less typing:)
 
