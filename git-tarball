@@ -34,6 +34,7 @@ sub parse_options {
 }
 
 sub _capture {
+    shift;
     my @cmd = @_;
     open my $fh, "-|", @cmd or die "@cmd: $!\n";
     my @line = <$fh>;
@@ -48,7 +49,7 @@ sub run {
     my $class = shift;
     my $self = $class->new;
     $self->parse_options(@_);
-    my $top_abs = _capture "git", "rev-parse", "--show-toplevel" or exit 1;
+    my $top_abs = $self->_capture("git", "rev-parse", "--show-toplevel") or exit 1;
     my $top = File::Basename::basename($top_abs);
     my $out_file = $self->{compress} eq "gzip" ? "$top.tar.gz" : "$top.tar.bz2";
     pipe my $read, my $write;
